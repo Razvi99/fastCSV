@@ -1,6 +1,27 @@
 #include <iostream>
+#include <chrono>
+
+#include "lib/fastCSV/fastCSV.hpp"
+#include "lib/fastCSV/rawReadBuffer.hpp"
+#include "lib/fastCSV/gzipReadBuffer.hpp"
 
 int main() {
-    std::cout << "Hello, World!" << std::endl;
+
+    auto fastCSV = FastCSV<500, GzipReadBuffer>("../data.csv.gz");
+
+    auto start =std::chrono::steady_clock::now();
+
+    int i = 0;
+
+    for (auto row : fastCSV) {
+        if(row[1][0] == '0')
+            i++;
+    }
+
+    auto end = std::chrono::steady_clock::now();
+
+    std::cerr << i << "\n";
+    printf("total: %f ms\n", (double) std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / 1e+6);
+
     return 0;
 }

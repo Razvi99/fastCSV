@@ -3,4 +3,6 @@ project(fastCSV)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(fastCSV main.cpp)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
+
+add_executable(fastCSV main.cpp lib/miniz/miniz.cpp)
