@@ -59,10 +59,17 @@ public:
         memcpy(buffer, toKeep, toKeepSize);
 
         // eof if inflator reported done last time
-        if (inflator.done) {
-            assert(raw_begin == raw_end);
-            eof = true;
-            return;
+        if (unlikely(inflator.done)) {
+            assert(inflator.verifyFooter(raw_begin));
+
+            if (raw_begin != raw_end && raw_end - raw_begin > 8) { // appended file
+                raw_begin += 8; // skip footer
+                raw_begin += MinizInflator::parseGzipHeader(raw_begin); // parse header
+                inflator = {}; // reset inflator
+            } else {
+                eof = true;
+                return;
+            }
         }
 
         buffer_end = buffer + toKeepSize;
@@ -73,11 +80,6 @@ public:
             assert(readSize != -1);
 
             if (readSize == 0) raw_eof = true;
-
-            if (readSize != BUFF_SIZE_RAW) { // temporary
-                readSize -= 8;
-                raw_eof = true;
-            }
 
             // update pointers
             raw_begin = raw_buffer;

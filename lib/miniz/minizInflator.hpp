@@ -19,6 +19,8 @@ class MinizInflator {
         FCOMMENT
     };
 
+    uint32_t len32 = 0; // len32 for footer verification
+
 public:
     bool done = false;
 
@@ -58,12 +60,17 @@ public:
         return p - mem;
     }
 
+    bool verifyFooter(const uint8_t *footer) const {
+        return *(uint32_t *) (footer + 4) == len32;
+    }
+
     void inflate(uint8_t *next_in, size_t *available_in, char *next_out, size_t *available_out, bool needs_more_input) {
         // if it fits, write the decompressed data to destination
         if (m_dict_avail) {
             size_t n = std::min(m_dict_avail, *available_out);
             memcpy(next_out, m_dict + m_dict_ofs, n);
             next_out += n;
+            len32 += n;
             *available_out -= n;
 
             m_dict_avail -= n;
@@ -92,6 +99,7 @@ public:
             size_t n = std::min(m_dict_avail, *available_out);
             memcpy(next_out, m_dict + m_dict_ofs, n);
             next_out += n;
+            len32 += n;
             *available_out -= n;
 
             m_dict_avail -= n;
