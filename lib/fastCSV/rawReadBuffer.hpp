@@ -7,13 +7,15 @@
 #include <cassert>
 #include <cstring>
 
+#ifndef unlikely
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
+
 class RawReadBuffer {
 private:
     int fd = -1;
 
 public:
-    static constexpr size_t MAX_LINE_SIZE = 32768; // in characters
-
     static constexpr size_t BUFF_SIZE_MB = 1;
     static constexpr size_t BUFF_SIZE_TOTAL = BUFF_SIZE_MB * (1U << 20U);
 

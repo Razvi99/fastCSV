@@ -9,15 +9,17 @@
 #include "../miniz/miniz.h"
 #include "../miniz/minizInflator.hpp"
 
+#ifndef unlikely
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
+
 class GzipReadBuffer {
 private:
-    int fd = -1;
-
-    static constexpr size_t MAX_LINE_SIZE = 32768; // in characters
-
     static constexpr size_t BUFF_SIZE_MB = 1;
     static constexpr size_t BUFF_SIZE_TOTAL = BUFF_SIZE_MB * (1U << 20U);
     static constexpr size_t BUFF_SIZE_RAW = BUFF_SIZE_TOTAL / 16;
+
+    int fd = -1;
 
     uint8_t raw_buffer[BUFF_SIZE_RAW]{};
     uint8_t *raw_begin = raw_buffer;
@@ -55,7 +57,6 @@ public:
 
         // copy toKeep data exactly before the data we'll read below
         memcpy(buffer, toKeep, toKeepSize);
-        buffer_end = buffer + toKeepSize;
 
         // eof if inflator reported done last time
         if (inflator.done) {
@@ -63,6 +64,8 @@ public:
             eof = true;
             return;
         }
+
+        buffer_end = buffer + toKeepSize;
 
         // fetch more raw data if need be
         if (raw_begin == raw_end) {
@@ -82,8 +85,8 @@ public:
         }
 
         // temp header skip
-        if (need_header_parse) {
-            raw_begin += 10;
+        if (unlikely(need_header_parse)) {
+            raw_begin += MinizInflator::parseGzipHeader(raw_begin);
             need_header_parse = false;
         }
 

@@ -3,6 +3,13 @@
 #include "rawReadBuffer.hpp"
 #include <cstring>
 
+#ifndef likely
+#define likely(x) __builtin_expect(!!(x), 1)
+#endif
+#ifndef unlikely
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
+
 template<int max_columns, class ReadBuffer = RawReadBuffer>
 class FastCSV {
     ReadBuffer io{};
@@ -13,15 +20,13 @@ class FastCSV {
     char *column[max_columns]{};
     int real_columns = -1;
 
-    void parseNextRow(bool recursed = false) {
+    void parseNextRow() {
         int current_column = 0;
         char *old_col_0 = column[0];
         column[current_column++] = buff_pos;
 
         while (*buff_pos != '\n') {
-            if (*buff_pos == ',') column[current_column++] = buff_pos + 1;
-
-            if (buff_pos + 1 >= io.buffer_end) {
+            if (unlikely(buff_pos + 1 >= io.buffer_end)) {
                 // this should not be the first row (increase buffer space if this assert fails)
                 assert(real_columns);
 
@@ -33,18 +38,17 @@ class FastCSV {
                 // reset the current buffer position to the new beginning
                 buff_pos = io.buffer_begin;
 
-                if(recursed) assert(false);
-
                 // if we could read more bytes, then parse the row from the beginning, if not.. stop
-                if (!io.eof) parseNextRow(true);
+                if (!io.eof) parseNextRow();
                 else {
                     assert(current_column == 1);
                     // if this is the end of file, restore the first column (modified at the beginning of this function)
                     column[0] = old_col_0;
-                    std::cerr<<at(0)<<"\n";
                 }
                 return;
             }
+
+            if (*buff_pos == ',') column[current_column++] = buff_pos + 1;
 
             ++buff_pos;
         }
@@ -63,8 +67,6 @@ class FastCSV {
 
         return std::string_view{column[index], (size_t) (column[index + 1] - column[index]) - 1};
     }
-
-    bool eof() { return io.eof; }
 
 public:
     explicit FastCSV(const char *path) : io{path}, buff_pos{io.buffer_begin} { parseNextRow(); }

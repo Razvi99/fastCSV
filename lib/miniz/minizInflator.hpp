@@ -12,8 +12,51 @@ class MinizInflator {
     size_t m_dict_avail = 0;
     size_t m_dict_ofs = 0;
 
+    enum gzip_flag_bits {
+        FHCRC = 1,
+        FEXTRA,
+        FNAME,
+        FCOMMENT
+    };
+
 public:
     bool done = false;
+
+    // takes in a memory address to the beginning of a raw gzip file
+    // returns the size of the gzip header, in bytes
+    static size_t parseGzipHeader(uint8_t *mem) {
+        uint8_t *p = mem;
+
+        p += 2; // p is now at compression type
+        assert(*p == 0x08); //only support defalte compression
+
+        p += 1; // p is now the flags byte
+        uint8_t flags = *p;
+
+        p += 7; // skip to after the end of the fixed header format
+
+        if (flags & 1U << FEXTRA) {
+            uint16_t extra_size;
+            memcpy(&extra_size, p, 2);
+            p += 2 + extra_size; // skip the 2 size bytes + the actual size
+        }
+
+        if (flags & 1U << FNAME) {
+            while (*p) ++p; // skip to null character
+            ++p; // now at next character after null
+        }
+
+        if (flags & 1U << FCOMMENT) {
+            while (*p) ++p;  // skip to null character
+            ++p; // now at next character after null
+        }
+
+        if (flags & 1U << FHCRC) {
+            p += 2; // skip header CRC16
+        }
+
+        return p - mem;
+    }
 
     void inflate(uint8_t *next_in, size_t *available_in, char *next_out, size_t *available_out, bool needs_more_input) {
         // if it fits, write the decompressed data to destination

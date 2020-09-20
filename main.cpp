@@ -6,12 +6,12 @@
 #include "lib/fastCSV/gzipReadBuffer.hpp"
 
 int main() {
-    auto fastCSV = new FastCSV<500, GzipReadBuffer>("../data.csv.gz");
+    auto fastCSV = new FastCSV<500>("../deribit.csv");
 
     auto start = std::chrono::steady_clock::now();
 
     int i = 0;
-
+    /*
     auto it = fastCSV->begin();
     auto enda = fastCSV->end();
     while (it != enda) {
@@ -19,10 +19,14 @@ int main() {
         if (it[1][0] == '0')
             i++;
     }
-    /*for (auto row : fastCSV) {
-        if(row[1][0] == '0')
+     */
+
+
+    for (auto row : *fastCSV) {
+        if (row[3][0] == '0')
             i++;
-    }*/
+    }
+
 
     auto end = std::chrono::steady_clock::now();
 
