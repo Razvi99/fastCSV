@@ -7,16 +7,23 @@
 
 int main() {
 
-    auto fastCSV = FastCSV<500, GzipReadBuffer>("../data.csv.gz");
+    auto fastCSV = FastCSV<500>("../data.csv");
 
-    auto start =std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
     int i = 0;
 
-    for (auto row : fastCSV) {
-        if(row[1][0] == '0')
+    auto it = fastCSV.begin();
+    auto enda = fastCSV.end();
+    while (it != enda) {
+        ++it;
+        if(it[1][0] == '0')
             i++;
     }
+    /*for (auto row : fastCSV) {
+        if(row[1][0] == '0')
+            i++;
+    }*/
 
     auto end = std::chrono::steady_clock::now();
 

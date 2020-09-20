@@ -27,14 +27,11 @@ class FastCSV {
 
                 int row_length_so_far = buff_pos - column[0] + 1;
 
-                assert(row_length_so_far + io.buffer < column[0]); // no overlap, increase buffer if this fails
-
                 // copy what the data for this row to the beginning of the buffer, and read more data after that
-                memcpy(io.buffer, column[0], row_length_so_far);
-                io.readMore(row_length_so_far);
+                io.readMore(column[0], row_length_so_far);
 
-                // reset the current buffer position to the beginning
-                buff_pos = io.buffer;
+                // reset the current buffer position to the new beginning
+                buff_pos = io.buffer_start;
 
                 // if we could read more bytes, then parse the row from the beginning, if not.. stop
                 if (!io.eof) parseNextRow();
@@ -67,7 +64,7 @@ class FastCSV {
     bool eof() { return io.eof; }
 
 public:
-    explicit FastCSV(const char *path) : io{path}, buff_pos{io.buffer} { parseNextRow(); }
+    explicit FastCSV(const char *path) : io{path}, buff_pos{io.buffer_start} { parseNextRow(); }
 
     class iterator {
     public:
