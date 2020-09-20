@@ -17,7 +17,7 @@ class FastCSV {
     char *buff_pos;
 
     // holds a pointer to the beginning of the element on column X
-    char *column[max_columns]{};
+    char *column[max_columns + 1]{};
     int real_columns = -1;
 
     void parseNextRow() {

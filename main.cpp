@@ -11,24 +11,10 @@ int main() {
     auto start = std::chrono::steady_clock::now();
 
     int i = 0;
-    /*
-    auto it = fastCSV->begin();
-    auto enda = fastCSV->end();
-    while (it != enda) {
-        ++it;
-        if (it[1][0] == '0')
-            i++;
-    }
-     */
-
-
     for (auto row : *fastCSV) {
-        if (row[0][0] == 'R')
+        if (row[0] == "-1") // std::string_view supports == between strings
             i++;
-
-    //   std::cerr << row[0] << "\n";
     }
-
 
     auto end = std::chrono::steady_clock::now();
 
