@@ -16,6 +16,7 @@ The second argument can also be `GzipReadBuffer`, which would be used with <i>.g
 * iterating a csv object row by row should be done with range-based for loops, for easier syntax and equal efficiency.
 * indexing a row is as easy as `row[COLUMN_INDEX]`. This returns a `std::string_view` (>C++17) object, which contains a pointer to the beginning of the original data and a size variable.
 * row parsing into columns is done when the iterator is incremented. Column accesses are O(1).
+* works with negative column indexes: `row[-2]` returns the second to last column.
 
 ## raw file example
 ```C++
@@ -24,7 +25,7 @@ auto csv = new FastCSV<500, RawReadBuffer>("/path/to/data.csv");
 for (auto row : *csv) {
     if (row[0] == "-1")
         // code
-    else if(row[0] == "0")
+    else if(row[-2].empty())
         // code
     else
         // code
@@ -41,7 +42,7 @@ auto csv = new FastCSV<500, GzipReadBuffer>("/path/to/data.csv.gz");
 for (auto row : *csv) {
     if (row[0] == "-1")
         // code
-    else if(row[0] == "0")
+    else if(row[-2].empty())
         // code
     else
         // code
