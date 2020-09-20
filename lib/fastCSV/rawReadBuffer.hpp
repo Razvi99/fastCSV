@@ -15,12 +15,12 @@ public:
     static constexpr size_t MAX_LINE_SIZE = 32768; // in characters
 
     static constexpr size_t BUFF_SIZE_MB = 1;
-    static constexpr size_t BUFF_SIZE_NO_PADDING = BUFF_SIZE_MB * (1U << 20U);
+    static constexpr size_t BUFF_SIZE_TOTAL = BUFF_SIZE_MB * (1U << 20U);
 
-    char buffer[BUFF_SIZE_NO_PADDING + MAX_LINE_SIZE]{};
+    char buffer[BUFF_SIZE_TOTAL]{};
 
 public:
-    char *buffer_begin = buffer + MAX_LINE_SIZE;
+    char *buffer_begin = buffer;
     char *buffer_end = buffer;
 
     bool eof = false;
@@ -41,18 +41,17 @@ public:
     // read bytes from file, and write to buffer + starting_from
     // sets eof = true when there are no more bytes to be read
     void readMore(char *toKeep, size_t toKeepSize) {
-        assert(toKeepSize < MAX_LINE_SIZE); // increase MAX_LINE_SIZE if this fails
+        assert(toKeep == nullptr || buffer + toKeepSize < toKeep); // increase buffer size if this fails
 
         // copy toKeep data exactly before the data we'll read below
-        memcpy(buffer + MAX_LINE_SIZE - toKeepSize, toKeep, toKeepSize);
+        memcpy(buffer, toKeep, toKeepSize);
+        buffer_end = buffer + toKeepSize;
 
-        int readSize = read(fd, buffer + MAX_LINE_SIZE, BUFF_SIZE_NO_PADDING);
+        int readSize = read(fd, buffer_end, BUFF_SIZE_TOTAL - toKeepSize);
         assert(readSize != -1);
 
         if (readSize == 0) eof = true;
 
-        // update start and end pointers
-        buffer_begin = buffer + MAX_LINE_SIZE - toKeepSize;
-        buffer_end = buffer_begin + readSize + toKeepSize;
+        buffer_end += readSize;
     }
 };

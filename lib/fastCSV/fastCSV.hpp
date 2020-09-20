@@ -13,7 +13,7 @@ class FastCSV {
     char *column[max_columns]{};
     int real_columns = -1;
 
-    void parseNextRow() {
+    void parseNextRow(bool recursed = false) {
         int current_column = 0;
         char *old_col_0 = column[0];
         column[current_column++] = buff_pos;
@@ -31,14 +31,17 @@ class FastCSV {
                 io.readMore(column[0], row_length_so_far);
 
                 // reset the current buffer position to the new beginning
-                buff_pos = io.buffer_start;
+                buff_pos = io.buffer_begin;
+
+                if(recursed) assert(false);
 
                 // if we could read more bytes, then parse the row from the beginning, if not.. stop
-                if (!io.eof) parseNextRow();
+                if (!io.eof) parseNextRow(true);
                 else {
                     assert(current_column == 1);
                     // if this is the end of file, restore the first column (modified at the beginning of this function)
                     column[0] = old_col_0;
+                    std::cerr<<at(0)<<"\n";
                 }
                 return;
             }
@@ -64,7 +67,7 @@ class FastCSV {
     bool eof() { return io.eof; }
 
 public:
-    explicit FastCSV(const char *path) : io{path}, buff_pos{io.buffer_start} { parseNextRow(); }
+    explicit FastCSV(const char *path) : io{path}, buff_pos{io.buffer_begin} { parseNextRow(); }
 
     class iterator {
     public:

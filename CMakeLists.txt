@@ -8,4 +8,4 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 
-add_executable(fastCSV main.cpp lib/miniz/miniz.cpp)
+add_executable(fastCSV main.cpp lib/miniz/miniz.cpp lib/miniz/minizInflator.hpp)
