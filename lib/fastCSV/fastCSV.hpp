@@ -47,7 +47,8 @@ class FastCSV {
                 // this should not be the first row (increase buffer space if this assert fails)
                 assert(row.columns);
 
-                size_t row_length_so_far = buff_pos - row.column[0] + 1;
+                // also takes care of buff_pos + 1 > io.buffer_end (we went over at the end of previous it), by using io.buffer_end
+                size_t row_length_so_far = io.buffer_end - row.column[0];
 
                 // copy what the data for this row to the beginning of the buffer, and read more data after that
                 io.readMore(row.column[0], row_length_so_far);
