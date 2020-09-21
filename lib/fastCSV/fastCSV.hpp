@@ -88,6 +88,7 @@ public:
 
     void skipRow() { parseNextRow(); }
     FastCSVRow &getRow() { return row; }
+    int getColumns() { return row.columns; }
 
     class iterator {
     public:
