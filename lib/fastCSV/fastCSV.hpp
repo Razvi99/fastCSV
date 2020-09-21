@@ -14,26 +14,43 @@ template<int max_columns, class ReadBuffer = RawReadBuffer>
 class FastCSV {
     ReadBuffer io{};
 
+    // indicates the current parsing position
     char *buff_pos;
 
-    // holds a pointer to the beginning of the element on column X
-    char *column[max_columns + 1]{};
-    int real_columns = -1;
+    class FastCSVRow {
+        friend class FastCSV;
+
+    public:
+        // returns the whole row, ',' included
+        [[nodiscard]] std::string_view getRaw() const { return std::string_view{column[0], (size_t) (column[columns] - column[0]) - 1}; }
+
+        // also works with negative indexes, -1 will get the last element of row
+        [[nodiscard]] std::string_view operator[](int index) const {
+            if (index < 0) index = columns + index;
+            assert(index < columns && index >= 0);
+
+            return std::string_view{column[index], (size_t) (column[index + 1] - column[index]) - 1};
+        }
+
+    private:
+        int columns = -1; // number of columns in the first row, used to check column number integrity in the document
+        char *column[max_columns + 1]{}; // holds a pointer to the beginning of the element of column X
+    } row{};
 
     void parseNextRow() {
         int current_column = 0;
-        char *old_col_0 = column[0];
-        column[current_column++] = buff_pos;
+        char *old_col_0 = row.column[0];
+        row.column[current_column++] = buff_pos;
 
         while (*buff_pos != '\n') {
             if (unlikely(buff_pos + 1 >= io.buffer_end)) {
                 // this should not be the first row (increase buffer space if this assert fails)
-                assert(real_columns);
+                assert(row.columns);
 
-                int row_length_so_far = buff_pos - column[0] + 1;
+                size_t row_length_so_far = buff_pos - row.column[0] + 1;
 
                 // copy what the data for this row to the beginning of the buffer, and read more data after that
-                io.readMore(column[0], row_length_so_far);
+                io.readMore(row.column[0], row_length_so_far);
 
                 // reset the current buffer position to the new beginning
                 buff_pos = io.buffer_begin;
@@ -43,56 +60,45 @@ class FastCSV {
                 else {
                     assert(current_column == 1);
                     // if this is the end of file, restore the first column (modified at the beginning of this function)
-                    column[0] = old_col_0;
+                    row.column[0] = old_col_0;
                 }
                 return;
             }
 
-            if (*buff_pos == ',') column[current_column++] = buff_pos + 1;
+            // mark the start of a new column right after the ','
+            if (*buff_pos == ',') row.column[current_column++] = buff_pos + 1;
 
             ++buff_pos;
         }
 
         // this is the start of the next row, used in size calculation for string_view
-        column[current_column] = ++buff_pos;
+        row.column[current_column] = ++buff_pos;
 
-        if (real_columns == -1) { real_columns = current_column; }
-        else { assert(current_column == real_columns); }
+        if (row.columns == -1) { row.columns = current_column; }
+        else { assert(current_column == row.columns); }
     }
 
-    // also works with negative indexes, -1 will get the last element of row
-    std::string_view at(int index) {
-        if (index < 0) index = real_columns + index;
-        assert(index < real_columns && index >= 0);
-
-        return std::string_view{column[index], (size_t) (column[index + 1] - column[index]) - 1};
-    }
+    struct sentinel {
+    };
 
 public:
     explicit FastCSV(const char *path) : io{path}, buff_pos{io.buffer_begin} { parseNextRow(); }
+    FastCSV(FastCSV &) = delete;
+    FastCSV(FastCSV &&) = delete;
+
+    void skipRow() { parseNextRow(); }
+    FastCSVRow &getRow() { return row; }
 
     class iterator {
     public:
-        explicit iterator(FastCSV *fastCsv, int index) : index{index}, fastCsv{fastCsv} {}
-
-        iterator &operator++() {
-            index++;
-            fastCsv->parseNextRow();
-
-            if (fastCsv->io.eof) index = -1; // if this is the end of file, set index = -1, indicating the end() iterator
-            return *this;
-        }
-        bool operator!=(const iterator &other) { return index != other.index; }
-        iterator operator*() { return *this; }
-
-        // this operator is used after dereferencing, so this class is a row & iterator combination
-        std::string_view operator[](int subscript) { return fastCsv->at(subscript); }
-
+        explicit iterator(FastCSV *fastCsv) : fastCsv{fastCsv} {}
+        void operator++() { fastCsv->parseNextRow(); }
+        bool operator!=(const sentinel) { return !fastCsv->io.eof; }
+        FastCSVRow &operator*() { return fastCsv->row; }
     private:
-        int index{};
         FastCSV *fastCsv{};
     };
 
-    iterator begin() { return iterator(this, 0); }
-    iterator end() { return iterator(this, -1); }
+    iterator begin() { return iterator{this}; }
+    sentinel end() { return sentinel{}; }
 };
