@@ -17,7 +17,7 @@ The second argument can also be `GzipReadBuffer`, which would be used with <i>.g
 * indexing a row is as easy as `row[COLUMN_INDEX]`. This returns a `std::string_view` (>C++17) object, which contains a pointer to the beginning of the original data and a size variable.
 * row parsing into columns is done when the iterator is incremented. Column accesses are O(1).
 * works with negative column indexes: `row[-2]` returns the second to last column.
-* using the `sv` operator to transform string literals to `std::string_view` is recommended, to avoid a call to strlen(). This operator is in the `std::literals::string_view_literals` namespace.
+* using the `sv` operator to construct a `std::string_view` from a string literal avoids a call to strlen() in debug (not optimised) builds. In reality, any build with at least `-O1` optimisation produces exactly the same binary, whether or not `sv` is used.
 
 ## header parsing
 The constructor of a FastCSV object can optionally receive an initializer list of `string_view` and `int&` pairs.
@@ -39,12 +39,10 @@ if (some_variable_name != -1)
 
 ## raw file example
 ```C++
-using namespace std::string_view_literals;
-
 auto csv = new FastCSV<500, RawReadBuffer>("/path/to/data.csv");
 
 for (auto row : *csv) {
-    if (row[0] == "-1"sv)
+    if (row[0] == "-1")
         // code
     else if(row[-2].empty())
         // code
@@ -57,13 +55,11 @@ delete csv;
 
 ## gzip file example
 ```C++
-using namespace std::string_view_literals;
-
 // the ONLY change is on this next line:
 auto csv = new FastCSV<500, GzipReadBuffer>("/path/to/data.csv.gz");
 
 for (auto row : *csv) {
-    if (row[0] == "-1"sv)
+    if (row[0] == "-1")
         // code
     else if(row[-2].empty())
         // code
