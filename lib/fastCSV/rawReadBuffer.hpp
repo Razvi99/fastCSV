@@ -43,10 +43,8 @@ public:
     // read bytes from file, and write to buffer + starting_from
     // sets eof = true when there are no more bytes to be read
     void readMore(char *toKeep, size_t toKeepSize) {
-        assert(toKeep == nullptr || buffer + toKeepSize < toKeep); // increase buffer size if this fails
-
         // copy toKeep data exactly before the data we'll read below
-        memcpy(buffer, toKeep, toKeepSize);
+        memmove(buffer, toKeep, toKeepSize);
         buffer_end = buffer + toKeepSize;
 
         int readSize = read(fd, buffer_end, BUFF_SIZE_TOTAL - toKeepSize);
