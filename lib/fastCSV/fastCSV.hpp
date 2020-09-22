@@ -83,7 +83,23 @@ class FastCSV {
     };
 
 public:
-    explicit FastCSV(const char *path) : io{path}, buff_pos{io.buffer_begin} { parseNextRow(); }
+    explicit FastCSV(const char *path, const std::initializer_list<std::pair<std::string_view, int &>> &&header_args = {})
+            : io{path}, buff_pos{io.buffer_begin} {
+        parseNextRow();
+
+        // parse header column names
+        if (header_args.size()) {
+            for (auto[header_column, index_pointer] : header_args) index_pointer = -1; // set to -1 initially
+            for (int i = 0; i < row.columns; ++i) {
+                for (auto[header_column, index_pointer] : header_args) {
+                    if (row[i] == header_column) {
+                        index_pointer = i; // set given reference to this index
+                        break;
+                    }
+                }
+            }
+        }
+    }
     FastCSV(FastCSV &) = delete;
     FastCSV(FastCSV &&) = delete;
 

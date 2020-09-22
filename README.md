@@ -18,6 +18,24 @@ The second argument can also be `GzipReadBuffer`, which would be used with <i>.g
 * row parsing into columns is done when the iterator is incremented. Column accesses are O(1).
 * works with negative column indexes: `row[-2]` returns the second to last column.
 
+## header parsing
+The constructor of a FastCSV object can optionally receive an initializer list of `string_view` and `int&` pairs.
+It will try to find the column name in the first row of the csv, and set the given variable to the index of that column.
+If the column with the requested name does not exist, the variable is set to `-1`.
+```C++
+int some_variable_name, badly_named_var, crazy_cool_column;
+
+auto csv = new FastCSV<420, GzipReadBuffer>("/path/to/data.csv.gz", {
+        {"some_column_name",  some_variable_name},
+        {"other_column_name", badly_named_var},
+        {"crazy_cool_column", crazy_cool_column},
+});
+
+// then the he following is guaranteed for all column name & variable pairs
+if (some_variable_name != -1)
+    assert(csv->getRow()[some_variable_name] == "some_column_name");
+```
+
 ## raw file example
 ```C++
 auto csv = new FastCSV<500, RawReadBuffer>("/path/to/data.csv");
