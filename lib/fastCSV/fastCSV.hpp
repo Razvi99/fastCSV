@@ -1,7 +1,6 @@
 #pragma once
 
 #include "rawReadBuffer.hpp"
-#include <cstring>
 
 #ifndef likely
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -103,16 +102,18 @@ public:
     FastCSV(FastCSV &) = delete;
     FastCSV(FastCSV &&) = delete;
 
-    void skipRow() { parseNextRow(); }
-    FastCSVRow &getRow() { return row; }
-    int getColumns() { return row.columns; }
+    void nextRow() { parseNextRow(); }
+    [[nodiscard]] const FastCSVRow &getRow() const { return row; }
+    [[nodiscard]] int getColumns() const { return row.columns; }
+
+    /* end-sentinel iterator */
 
     class iterator {
     public:
         explicit iterator(FastCSV *fastCsv) : fastCsv{fastCsv} {}
         void operator++() { fastCsv->parseNextRow(); }
         bool operator!=(const sentinel) { return !fastCsv->io.eof; }
-        FastCSVRow &operator*() { return fastCsv->row; }
+        const FastCSVRow &operator*() { return fastCsv->row; }
     private:
         FastCSV *fastCsv{};
     };
