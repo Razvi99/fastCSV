@@ -36,6 +36,7 @@ class FastCSV {
         char *column[max_columns + 1]{}; // holds a pointer to the beginning of the element of column X
     } row{};
 
+    template<bool first_row = false>
     void parseNextRow() {
         int current_column = 0;
         char *old_col_0 = row.column[0];
@@ -44,7 +45,7 @@ class FastCSV {
         while (*buff_pos != '\n') {
             if (unlikely(buff_pos + 1 >= io.buffer_end)) {
                 // this should not be the first row (increase buffer space if this assert fails)
-                assert(row.columns);
+                if constexpr (first_row) assert(false);
 
                 // also takes care of buff_pos + 1 > io.buffer_end (we went over at the end of previous it), by using io.buffer_end
                 size_t row_length_so_far = io.buffer_end - row.column[0];
@@ -74,8 +75,8 @@ class FastCSV {
         // this is the start of the next row, used in size calculation for string_view
         row.column[current_column] = ++buff_pos;
 
-        if (row.columns == -1) { row.columns = current_column; }
-        else { assert(current_column == row.columns); }
+        if constexpr (first_row) row.columns = current_column;
+        assert(row.columns == current_column);
     }
 
     struct sentinel {
@@ -84,7 +85,7 @@ class FastCSV {
 public:
     explicit FastCSV(const char *path, const std::initializer_list<std::pair<std::string_view, int &>> &&header_args = {})
             : io{path}, buff_pos{io.buffer_begin} {
-        parseNextRow();
+        parseNextRow<true>();
 
         // parse header column names
         if (header_args.size()) {
