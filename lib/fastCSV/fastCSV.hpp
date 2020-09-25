@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rawReadBuffer.hpp"
+#include <x86intrin.h>
 
 #ifndef likely
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -36,48 +37,128 @@ class FastCSV {
         char *column[max_columns + 1]{}; // holds a pointer to the beginning of the element of column X
     } row{};
 
+#ifdef __AVX2__
+    inline __attribute__((always_inline, unused)) uint64_t maskForChar(char *ptr, char toFind) {
+        // load
+        __m256i reg_lo = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
+        __m256i reg_hi = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr + 32));
+
+        // compare
+        const __m256i mask = _mm256_set1_epi8(toFind);
+        uint64_t cmp_lo = static_cast<uint32_t>(_mm256_movemask_epi8(_mm256_cmpeq_epi8(reg_lo, mask)));
+        uint64_t cmp_hi = _mm256_movemask_epi8(_mm256_cmpeq_epi8(reg_hi, mask));
+
+        return cmp_lo | (cmp_hi << 32ULL);
+    }
+
+    inline __attribute__((always_inline, unused)) int trailing_zeroes(uint64_t input) {
+#ifdef __BMI2__
+        return (int) _tzcnt_u64(input);
+#else
+        return __builtin_ctzll(input);
+#endif
+    }
+
+    inline __attribute__((always_inline, unused)) int popcount(uint64_t input) {
+        return __builtin_popcountll(input);
+    }
+
     template<bool first_row = false>
     void parseNextRow() {
         int current_column = 0;
-        char *old_col_0 = row.column[0];
         row.column[current_column++] = buff_pos;
 
-        while (*buff_pos != '\n') {
-            if (unlikely(buff_pos + 1 >= io.buffer_end)) {
+        while (maskForChar(buff_pos, '\n') == 0ULL) { // if no newline found in the next 64 bytes
+            uint64_t masked_commas = maskForChar(buff_pos, ','); // 1 bit where comma was found
+            const int set_bits = popcount(masked_commas); // count 1 bits
+
+            // process all comma locations
+            for (int i = 0; i < set_bits; i++) {
+                row.column[current_column++] = buff_pos + 1 + trailing_zeroes(masked_commas);
+                masked_commas = masked_commas & (masked_commas - 1ULL); // remove trailing 1 bit
+            }
+
+            buff_pos += 64;
+
+            // if while would exit if we coudln't fetch more data
+            if (unlikely(buff_pos + 64 >= io.buffer_end)) {
                 // this should not be the first row (increase buffer space if this assert fails)
                 if constexpr (first_row) assert(false);
 
-                // also takes care of buff_pos + 1 > io.buffer_end (we went over at the end of previous it), by using io.buffer_end
-                size_t row_length_so_far = io.buffer_end - row.column[0];
+                // copy the data for this row to the beginning of the buffer, and read more data after that
+                // io.buffer_end - row.column[0] is the number of bytes to be kept in the buffer
+                io.readMore(row.column[0], io.buffer_end - row.column[0]);
 
-                // copy what the data for this row to the beginning of the buffer, and read more data after that
-                io.readMore(row.column[0], row_length_so_far);
-
-                // reset the current buffer position to the new beginning
-                buff_pos = io.buffer_begin;
-
-                // if we could read more bytes, then parse the row from the beginning, if not.. stop
-                if (!io.eof) parseNextRow();
-                else {
-                    assert(current_column == 1);
-                    // if this is the end of file, restore the first column (modified at the beginning of this function)
-                    row.column[0] = old_col_0;
+                // if there are more bytes to process, reset buffer position and reparse this row
+                if (likely(!io.eof)) {
+                    buff_pos = io.buffer_begin;
+                    return parseNextRow();
                 }
-                return;
+                // else exit while
+                // it is guaranteed by io.readMore() that (toKeep, toKeep + toKeepSize) is the same as before the call if io.eof
+                break;
             }
-
-            // mark the start of a new column right after the ','
-            if (*buff_pos == ',') row.column[current_column++] = buff_pos + 1;
-
-            ++buff_pos;
         }
 
+        // manually process last bytes
+        int new_pos = trailing_zeroes(maskForChar(buff_pos, '\n'));
+        for (int offset = 0; offset < new_pos; ++offset)
+            if (buff_pos[offset] == ',') row.column[current_column++] = buff_pos + offset + 1;
+        buff_pos += new_pos;
+
         // this is the start of the next row, used in size calculation for string_view
-        row.column[current_column] = ++buff_pos;
+        row.column[current_column] = ++buff_pos; // also skip newline
+
+        if (unlikely(buff_pos + 64 >= io.buffer_end && !io.eof)) {
+            assert(io.buffer_end - buff_pos >= 0);
+
+            // copy the data for this row to the beginning of the buffer, and read more data after that
+            // io.buffer_end - buff_pos is the number of bytes to be kept in the buffer
+            io.readMore(buff_pos, io.buffer_end - buff_pos);
+            buff_pos = io.buffer_begin;
+        }
 
         if constexpr (first_row) row.columns = current_column;
         assert(row.columns == current_column);
     }
+#else
+    template<bool first_row = false>
+    void parseNextRow() {
+        int current_column = 0;
+        row.column[current_column++] = buff_pos;
+
+        while (*buff_pos != '\n') {
+            // mark the start of a new column right after the ','
+            if (*buff_pos == ',') row.column[current_column++] = buff_pos + 1;
+
+            ++buff_pos;
+
+            if (unlikely(buff_pos + 1 >= io.buffer_end)) {
+                // this should not be the first row (increase buffer space if this assert fails)
+                if constexpr (first_row) assert(false);
+
+                // copy the data for this row to the beginning of the buffer, and read more data after that
+                // io.buffer_end - row.column[0] is the number of bytes to be kept in the buffer
+                io.readMore(row.column[0], io.buffer_end - row.column[0]);
+
+                // if there are more bytes to process, reset buffer position and reparse this row
+                if (likely(!io.eof)) {
+                    buff_pos = io.buffer_begin;
+                    return parseNextRow();
+                }
+                // else exit while
+                // it is guaranteed by io.readMore() that (toKeep, toKeep + toKeepSize) is the same as before the call if io.eof
+                break;
+            }
+        }
+
+        // this is the start of the next row, used in size calculation for string_view
+        row.column[current_column] = ++buff_pos; // also skip newline
+
+        if constexpr (first_row) row.columns = current_column;
+        assert(row.columns == current_column);
+    }
+#endif
 
     struct sentinel {
     };
@@ -103,7 +184,7 @@ public:
     FastCSV(FastCSV &) = delete;
     FastCSV(FastCSV &&) = delete;
 
-    void nextRow() { parseNextRow(); }
+    void nextRow() { if (!io.eof) parseNextRow(); }
     [[nodiscard]] const FastCSVRow &getRow() const { return row; }
     [[nodiscard]] int getColumns() const { return row.columns; }
 

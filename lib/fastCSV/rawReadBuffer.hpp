@@ -19,7 +19,7 @@ public:
     static constexpr size_t BUFF_SIZE_MB = 1;
     static constexpr size_t BUFF_SIZE_TOTAL = BUFF_SIZE_MB * (1U << 20U);
 
-    char buffer[BUFF_SIZE_TOTAL]{};
+    char buffer[BUFF_SIZE_TOTAL + 64]{};
 
 public:
     char *buffer_begin = buffer;
@@ -50,7 +50,15 @@ public:
         int readSize = read(fd, buffer_end, BUFF_SIZE_TOTAL - toKeepSize);
         assert(readSize != -1);
 
-        if (readSize == 0) eof = true;
+        if (unlikely(readSize == 0)) {
+            eof = true;
+
+            // move the copied data back to the original position
+            memmove(toKeep, buffer, toKeepSize);
+            buffer_end = toKeep + toKeepSize;
+
+            memset(buffer_end, 0, 64); // clear last 64 bytes
+        }
 
         buffer_end += readSize;
     }

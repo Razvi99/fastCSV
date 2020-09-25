@@ -27,7 +27,7 @@ private:
     bool raw_eof = false;
     bool need_header_parse = true;
 
-    char buffer[BUFF_SIZE_TOTAL]{};
+    char buffer[BUFF_SIZE_TOTAL + 64]{};
 
     MinizInflator inflator{};
 
@@ -53,9 +53,6 @@ public:
     // read bytes from file, and write to buffer + starting_from
     // sets eof = true when there are no more bytes to be read
     void readMore(char *toKeep, size_t toKeepSize) {
-        // copy toKeep data exactly before the data we'll read below
-        memmove(buffer, toKeep, toKeepSize);
-
         // eof if inflator reported done last time
         if (unlikely(inflator.done)) {
             assert(inflator.verifyFooter(raw_begin));
@@ -66,10 +63,13 @@ public:
                 inflator = {}; // reset inflator
             } else {
                 eof = true;
+                memset(buffer_end, 0, 64); // clear last 64 bytes
                 return;
             }
         }
 
+        // copy toKeep data exactly before the data we'll read below
+        memmove(buffer, toKeep, toKeepSize);
         buffer_end = buffer + toKeepSize;
 
         // fetch more raw data if need be
