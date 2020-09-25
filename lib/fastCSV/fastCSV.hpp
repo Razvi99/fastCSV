@@ -3,7 +3,9 @@
 #include "rawReadBuffer.hpp"
 
 #ifdef __AVX2__
+
 #include <x86intrin.h>
+
 #endif
 
 #ifndef likely
@@ -19,6 +21,7 @@ class FastCSV {
 
     // indicates the current parsing position
     char *buff_pos;
+    bool eos = false; // end of stream
 
     class FastCSVRow {
         friend class FastCSV;
@@ -66,6 +69,11 @@ class FastCSV {
 
     template<bool first_row = false>
     void parseNextRow() {
+        if (unlikely(io.eof)) {
+            eos = true;
+            return;
+        }
+
         if (unlikely(buff_pos + 64 >= io.buffer_end && !io.eof)) {
             assert(io.buffer_end - buff_pos >= 0);
 
@@ -120,12 +128,17 @@ class FastCSV {
         row.column[current_column] = ++buff_pos; // also skip newline
 
         if constexpr (first_row) row.columns = current_column;
-        assert(row.columns == current_column);
+        assert(row.columns == current_column && "CSV file has inconsistent number of columns");
     }
 #else
 
     template<bool first_row = false>
     void parseNextRow() {
+        if (unlikely(io.eof)) {
+            eos = true;
+            return;
+        }
+
         int current_column = 0;
         row.column[current_column++] = buff_pos;
 
@@ -158,7 +171,7 @@ class FastCSV {
         row.column[current_column] = ++buff_pos; // also skip newline
 
         if constexpr (first_row) row.columns = current_column;
-        assert(row.columns == current_column);
+        assert(row.columns == current_column && "CSV file has inconsistent number of columns");
     }
 #endif
 
@@ -196,7 +209,7 @@ public:
     public:
         explicit iterator(FastCSV *fastCsv) : fastCsv{fastCsv} {}
         void operator++() { fastCsv->parseNextRow(); }
-        bool operator!=(const sentinel) { return !fastCsv->io.eof; }
+        bool operator!=(const sentinel) { return !fastCsv->eos; }
         const FastCSVRow &operator*() { return fastCsv->row; }
     private:
         FastCSV *fastCsv{};
