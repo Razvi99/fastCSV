@@ -66,6 +66,15 @@ class FastCSV {
 
     template<bool first_row = false>
     void parseNextRow() {
+        if (unlikely(buff_pos + 64 >= io.buffer_end && !io.eof)) {
+            assert(io.buffer_end - buff_pos >= 0);
+
+            // copy the data for this row to the beginning of the buffer, and read more data after that
+            // io.buffer_end - buff_pos is the number of bytes to be kept in the buffer
+            io.readMore(buff_pos, io.buffer_end - buff_pos);
+            buff_pos = io.buffer_begin;
+        }
+
         int current_column = 0;
         row.column[current_column++] = buff_pos;
 
@@ -109,15 +118,6 @@ class FastCSV {
 
         // this is the start of the next row, used in size calculation for string_view
         row.column[current_column] = ++buff_pos; // also skip newline
-
-        if (unlikely(buff_pos + 64 >= io.buffer_end && !io.eof)) {
-            assert(io.buffer_end - buff_pos >= 0);
-
-            // copy the data for this row to the beginning of the buffer, and read more data after that
-            // io.buffer_end - buff_pos is the number of bytes to be kept in the buffer
-            io.readMore(buff_pos, io.buffer_end - buff_pos);
-            buff_pos = io.buffer_begin;
-        }
 
         if constexpr (first_row) row.columns = current_column;
         assert(row.columns == current_column);
