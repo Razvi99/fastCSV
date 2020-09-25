@@ -38,7 +38,7 @@ class FastCSV {
     } row{};
 
 #ifdef __AVX2__
-    inline __attribute__((always_inline, unused)) uint64_t maskForChar(char *ptr, char toFind) {
+    static inline __attribute__((always_inline, unused)) uint64_t maskForChar(char *ptr, char toFind) {
         // load
         __m256i reg_lo = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr));
         __m256i reg_hi = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ptr + 32));
@@ -51,7 +51,7 @@ class FastCSV {
         return cmp_lo | (cmp_hi << 32ULL);
     }
 
-    inline __attribute__((always_inline, unused)) int trailing_zeroes(uint64_t input) {
+    static inline __attribute__((always_inline, unused)) int trailing_zeroes(uint64_t input) {
 #ifdef __BMI2__
         return (int) _tzcnt_u64(input);
 #else
@@ -59,9 +59,7 @@ class FastCSV {
 #endif
     }
 
-    inline __attribute__((always_inline, unused)) int popcount(uint64_t input) {
-        return __builtin_popcountll(input);
-    }
+    inline __attribute__((always_inline, unused)) int popcount(uint64_t input) { return __builtin_popcountll(input); }
 
     template<bool first_row = false>
     void parseNextRow() {
@@ -122,6 +120,7 @@ class FastCSV {
         assert(row.columns == current_column);
     }
 #else
+
     template<bool first_row = false>
     void parseNextRow() {
         int current_column = 0;

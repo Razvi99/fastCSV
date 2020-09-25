@@ -12,6 +12,8 @@ The second argument defaults to `RawReadBuffer`, which is the raw file reader. T
 The second argument can also be `GzipReadBuffer`, which would be used with <i>.gz</i> files.
 
 ## general tips
+* not completely csv-standard compliant, it <b>does NOT deal with quoted columns</b>.
+* uses <b>SIMD</b> (AVX2) instructions if available, to process 64 characters at once.
 * a FastCSV object should be heap-allocated with new(), as it uses more than 1MB of memory - a bit to much for the stack.
 * iterating a csv object row by row should be done with range-based for loops, for easier syntax and equal efficiency.
 * indexing a row is as easy as `row[COLUMN_INDEX]`. This returns a `std::string_view` (>C++17) object, which contains a pointer to the beginning of the original data and a size variable.
