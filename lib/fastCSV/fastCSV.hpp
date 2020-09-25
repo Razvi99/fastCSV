@@ -1,7 +1,10 @@
 #pragma once
 
 #include "rawReadBuffer.hpp"
+
+#ifdef __AVX2__
 #include <x86intrin.h>
+#endif
 
 #ifndef likely
 #define likely(x) __builtin_expect(!!(x), 1)
