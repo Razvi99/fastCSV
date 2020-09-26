@@ -23,6 +23,7 @@ class FastCSV {
     char *buff_pos;
     bool eos = false; // end of stream
 
+public:
     class FastCSVRow {
         friend class FastCSV;
 
@@ -43,6 +44,7 @@ class FastCSV {
         char *column[max_columns + 1]{}; // holds a pointer to the beginning of the element of column X
     } row{};
 
+private:
 #ifdef __AVX2__
     static inline __attribute__((always_inline, unused)) uint64_t maskForChar(char *ptr, char toFind) {
         // load
@@ -131,7 +133,6 @@ class FastCSV {
         assert(row.columns == current_column && "CSV file has inconsistent number of columns");
     }
 #else
-
     template<bool first_row = false>
     void parseNextRow() {
         if (unlikely(io.eof)) {
@@ -199,8 +200,9 @@ public:
     FastCSV(FastCSV &) = delete;
     FastCSV(FastCSV &&) = delete;
 
-    void nextRow() { if (!io.eof) parseNextRow(); }
+    void nextRow() { parseNextRow(); }
     [[nodiscard]] const FastCSVRow &getRow() const { return row; }
+    [[nodiscard]] bool finished() const { return eos; }
     [[nodiscard]] int getColumns() const { return row.columns; }
 
     /* end-sentinel iterator */
