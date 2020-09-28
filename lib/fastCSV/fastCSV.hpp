@@ -184,6 +184,9 @@ public:
             : io{path}, buff_pos{io.buffer_begin} {
         parseNextRow<true>();
 
+        // make sure that max_columns were enough
+        assert(row.columns < max_columns + 1 && "CSV file has more columns than given maximum");
+
         // parse header column names
         if (header_args.size()) {
             for (auto[header_column, index_pointer] : header_args) index_pointer = -1; // set to -1 initially
