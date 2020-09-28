@@ -1,0 +1,331 @@
+# Copyright (c) 2013 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+is_debug = false
+
+##
+is_clang = false # use GCC
+is_win = false
+
+if (current_cpu == "arm" || current_cpu == "arm64") {
+    import("//build/config/arm.gni")
+}
+
+config("zlib_config") {
+    include_dirs = [ "." ]
+}
+
+config("zlib_internal_config") {
+    defines = [ "ZLIB_IMPLEMENTATION" ]
+
+    if (!is_debug) {
+        cflags = [ "-O3" ]
+        cflags += [ "-march=native" ]
+    }
+    if (is_debug) {
+    # Enable zlib's asserts in debug and fuzzer builds.
+        defines += [ "ZLIB_DEBUG" ]
+    }
+}
+
+source_set("zlib_common_headers") {
+    sources = [
+        "chromeconf.h",
+        "deflate.h",
+        "inffast.h",
+        "inffixed.h",
+        "inflate.h",
+        "inftrees.h",
+        "zconf.h",
+        "zlib.h",
+        "zutil.h",
+    ]
+}
+
+use_arm_neon_optimizations = false
+if ((current_cpu == "arm" || current_cpu == "arm64") &&
+!(is_win && !is_clang)) {
+# TODO(richard.townsend@arm.com): Optimizations temporarily disabled for
+# Windows on Arm MSVC builds, see http://crbug.com/v8/10012.
+    if (arm_use_neon) {
+        use_arm_neon_optimizations = true
+    }
+}
+
+use_x86_x64_optimizations = (current_cpu == "x86" || current_cpu == "x64")
+
+config("zlib_adler32_simd_config") {
+    if (use_x86_x64_optimizations) {
+        defines = [ "ADLER32_SIMD_SSSE3" ]
+        if (is_win) {
+            defines += [ "X86_WINDOWS" ]
+        } else {
+            defines += [ "X86_NOT_WINDOWS" ]
+        }
+    }
+
+    if (use_arm_neon_optimizations) {
+        defines = [ "ADLER32_SIMD_NEON" ]
+    }
+}
+
+source_set("zlib_adler32_simd") {
+    visibility = [ ":*" ]
+
+    if (use_x86_x64_optimizations) {
+        sources = [
+            "adler32_simd.c",
+            "adler32_simd.h",
+        ]
+
+        if (!is_win || is_clang) {
+            cflags = [ "-mssse3" ]
+        }
+    }
+
+    if (use_arm_neon_optimizations) {
+        sources = [
+            "adler32_simd.c",
+            "adler32_simd.h",
+        ]
+    }
+
+    configs += [ ":zlib_internal_config" ]
+
+    public_configs = [ ":zlib_adler32_simd_config" ]
+
+    public_deps = [ ":zlib_common_headers" ]
+}
+
+if (use_arm_neon_optimizations) {
+    config("zlib_arm_crc32_config") {
+    # Disabled for iPhone, as described in DDI0487C_a_armv8_arm:
+    #  "All implementations of the ARMv8.1 architecture are required to
+    #   implement the CRC32* instructions. These are optional in ARMv8.0."
+        if (!is_ios) {
+            defines = [ "CRC32_ARMV8_CRC32" ]
+            if (is_android) {
+                defines += [ "ARMV8_OS_ANDROID" ]
+            } else if (is_linux || is_chromeos) {
+                defines += [ "ARMV8_OS_LINUX" ]
+            } else if (is_mac) {
+                defines += [ "ARMV8_OS_MACOS" ]
+            } else if (is_fuchsia) {
+                defines += [ "ARMV8_OS_FUCHSIA" ]
+            } else if (is_win) {
+                defines += [ "ARMV8_OS_WINDOWS" ]
+            } else {
+                assert(false, "Unsupported ARM OS")
+            }
+        }
+    }
+
+    source_set("zlib_arm_crc32") {
+        visibility = [ ":*" ]
+
+        if (!is_ios) {
+            include_dirs = [ "." ]
+
+            if (!is_win && !is_clang) {
+                assert(!use_thin_lto,
+                "ThinLTO fails mixing different module-level targets")
+                cflags_c = [ "-march=armv8-a+crc" ]
+            }
+
+            sources = [
+                "crc32_simd.c",
+                "crc32_simd.h",
+            ]
+        }
+
+        configs += [ ":zlib_internal_config" ]
+
+        public_configs = [ ":zlib_arm_crc32_config" ]
+
+        public_deps = [ ":zlib_common_headers" ]
+    }
+}
+
+config("zlib_inflate_chunk_simd_config") {
+    if (use_x86_x64_optimizations) {
+        defines = [ "INFLATE_CHUNK_SIMD_SSE2" ]
+
+        if (current_cpu == "x64") {
+            defines += [ "INFLATE_CHUNK_READ_64LE" ]
+        }
+    }
+
+    if (use_arm_neon_optimizations) {
+        defines = [ "INFLATE_CHUNK_SIMD_NEON" ]
+
+        if (current_cpu == "arm64") {
+            defines += [ "INFLATE_CHUNK_READ_64LE" ]
+        }
+    }
+}
+
+source_set("zlib_inflate_chunk_simd") {
+    visibility = [ ":*" ]
+
+    if (use_x86_x64_optimizations || use_arm_neon_optimizations) {
+        include_dirs = [ "." ]
+
+        sources = [
+            "contrib/optimizations/chunkcopy.h",
+            "contrib/optimizations/inffast_chunk.c",
+            "contrib/optimizations/inffast_chunk.h",
+            "contrib/optimizations/inflate.c",
+        ]
+    }
+
+    configs += [ ":zlib_internal_config" ]
+
+    public_configs = [ ":zlib_inflate_chunk_simd_config" ]
+
+    public_deps = [ ":zlib_common_headers" ]
+}
+
+config("zlib_crc32_simd_config") {
+    if (use_x86_x64_optimizations) {
+        defines = [ "CRC32_SIMD_SSE42_PCLMUL" ]
+    }
+}
+
+source_set("zlib_crc32_simd") {
+    visibility = [ ":*" ]
+
+    if (use_x86_x64_optimizations) {
+        sources = [
+            "crc32_simd.c",
+            "crc32_simd.h",
+        ]
+
+        if (!is_win || is_clang) {
+            cflags = [
+                "-msse4.2",
+                "-mpclmul",
+            ]
+        }
+    }
+
+    configs += [ ":zlib_internal_config" ]
+
+    public_configs = [ ":zlib_crc32_simd_config" ]
+    public_deps = [ ":zlib_common_headers" ]
+}
+
+config("zlib_x86_simd_config") {
+    if (use_x86_x64_optimizations) {
+        defines = [
+            "CRC32_SIMD_SSE42_PCLMUL",
+            "DEFLATE_FILL_WINDOW_SSE2",
+        ]
+    }
+}
+
+source_set("zlib_x86_simd") {
+    visibility = [ ":*" ]
+
+    if (use_x86_x64_optimizations) {
+        sources = [
+            "crc_folding.c",
+            "fill_window_sse.c",
+        ]
+
+        if (!is_win || is_clang) {
+            cflags = [
+                "-msse4.2",
+                "-mpclmul",
+            ]
+        }
+    }
+
+    configs += [ ":zlib_internal_config" ]
+
+    public_configs = [ ":zlib_x86_simd_config" ]
+
+    public_deps = [ ":zlib_common_headers" ]
+}
+
+config("zlib_warnings") {
+    if (is_clang && use_x86_x64_optimizations) {
+        cflags = [ "-Wno-incompatible-pointer-types" ]
+    }
+}
+
+static_library("zlib") {
+    if (!is_win) {
+    # Don't stomp on "libzlib" on other platforms.
+        output_name = "zlib_chromium"
+    }
+
+    sources = [
+        "adler32.c",
+        "chromeconf.h",
+        "compress.c",
+        "contrib/optimizations/insert_string.h",
+        "cpu_features.c",
+        "cpu_features.h",
+        "crc32.c",
+        "crc32.h",
+        "deflate.c",
+        "deflate.h",
+        "gzclose.c",
+        "gzguts.h",
+        "gzlib.c",
+        "gzread.c",
+        "gzwrite.c",
+        "infback.c",
+        "inffast.c",
+        "inffast.h",
+        "inffixed.h",
+        "inflate.h",
+        "inftrees.c",
+        "inftrees.h",
+        "trees.c",
+        "trees.h",
+        "uncompr.c",
+        "zconf.h",
+        "zlib.h",
+        "zutil.c",
+        "zutil.h",
+    ]
+
+    defines = []
+    deps = []
+
+    if (!use_x86_x64_optimizations && !use_arm_neon_optimizations) {
+    # Apparently android_cronet bot builds with NEON disabled and
+    # we also should disable optimizations for iOS@x86 (a.k.a. simulator).
+        defines += [ "CPU_NO_SIMD" ]
+    }
+
+    if (use_x86_x64_optimizations || use_arm_neon_optimizations) {
+        deps += [
+            ":zlib_adler32_simd",
+            ":zlib_inflate_chunk_simd",
+        ]
+
+        if (use_x86_x64_optimizations) {
+            deps += [ ":zlib_crc32_simd" ]
+        } else if (use_arm_neon_optimizations) {
+            sources += [ "contrib/optimizations/slide_hash_neon.h" ]
+            deps += [ ":zlib_arm_crc32" ]
+        }
+    } else {
+        sources += [ "inflate.c" ]
+    }
+
+    deps += [ ":zlib_x86_simd" ]
+
+    public_configs = [ ":zlib_config" ]
+
+    configs += [
+        ":zlib_internal_config",
+        ":zlib_warnings",
+    ]
+
+    allow_circular_includes_from = deps
+    complete_static_lib = true
+}

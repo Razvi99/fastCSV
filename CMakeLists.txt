@@ -9,4 +9,11 @@ add_compile_options("-march=native")
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 
-add_executable(fastCSV main.cpp lib/miniz/miniz.cpp lib/miniz/minizInflator.hpp)
+# pthread
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+add_executable(fastCSV test_main.cpp lib/miniz/miniz.cpp lib/miniz/minizInflator.hpp)
+
+get_filename_component(BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
+target_link_libraries(fastCSV Threads::Threads ${BASE_DIR}/lib/zlib/libzlib_chromium.a)

@@ -103,7 +103,7 @@ private:
 
             buff_pos += 64;
 
-            // if while would exit if we coudln't fetch more data
+            // if next step would exit
             if (unlikely(buff_pos + 64 >= io.buffer_end)) {
                 // this should not be the first row (increase buffer space if this assert fails)
                 if constexpr (first_row) assert(false);
