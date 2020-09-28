@@ -50,7 +50,7 @@ public:
     // close the file when this object is deleted
     ~GzipReadBuffer_zlib() {
         assert(close(fd) == 0);
-        assert(inflateEnd(&inflator));
+        assert(inflateEnd(&inflator) == 0);
     }
 
     // read bytes from file, and write to buffer + starting_from
