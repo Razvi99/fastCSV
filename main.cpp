@@ -11,13 +11,13 @@ int main() {
     auto start = std::chrono::steady_clock::now();
 
     fastCSV->nextRow(); // skips header
-    auto second_row = fastCSV->getRow(); // gets current row (2nd)
+    const auto &second_row = fastCSV->getRow(); // gets current row (2nd)
     std::string_view first_col = second_row[-2]; // access second to last column of row
     std::string_view second_row_string = second_row.getRaw(); // get the whole row as a string
 
     std::cerr << first_col << "\n" << second_row_string << "\n";
 
-    for (auto row : *fastCSV) {
+    for (const auto &row : *fastCSV) {
         if (row[2] == "ColumnText") // std::string_view supports == between strings
             std::cerr << row.getRaw();
     }

@@ -39,6 +39,9 @@ public:
             return std::string_view{column[index], (size_t) (column[index + 1] - column[index]) - 1};
         }
 
+        FastCSVRow() = default;
+        FastCSVRow(FastCSVRow &) = delete;
+        FastCSVRow(FastCSVRow &&) = delete;
     private:
         int columns = -1; // number of columns in the first row, used to check column number integrity in the document
         char *column[max_columns + 1]{}; // holds a pointer to the beginning of the element of column X

@@ -43,7 +43,7 @@ if (some_variable_name != -1)
 ```C++
 auto csv = new FastCSV<500, RawReadBuffer>("/path/to/data.csv");
 
-for (auto row : *csv) {
+for (const auto &row : *csv) {
     if (row[0] == "-1")
         // code
     else if(row[-2].empty())
@@ -60,7 +60,7 @@ delete csv;
 // the ONLY change is on this next line:
 auto csv = new FastCSV<500, GzipReadBuffer>("/path/to/data.csv.gz");
 
-for (auto row : *csv) {
+for (const auto &row : *csv) {
     if (row[0] == "-1")
         // code
     else if(row[-2].empty())
