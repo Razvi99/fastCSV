@@ -5,9 +5,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cassert>
+#include <cstring>
 
-#include "../miniz/miniz.h"
-#include "../miniz/minizInflator.hpp"
+#include "../zlib/zlib.h"
 
 #ifndef unlikely
 #define unlikely(x) __builtin_expect(!!(x), 0)
@@ -24,12 +24,11 @@ private:
     uint8_t raw_buffer[BUFF_SIZE_RAW]{};
     uint8_t *raw_begin = raw_buffer;
     uint8_t *raw_end = raw_buffer;
-    bool raw_eof = false;
-    bool need_header_parse = true;
 
     char buffer[BUFF_SIZE_TOTAL + 64]{};
 
-    MinizInflator inflator{};
+    z_stream inflator{};
+    bool zlib_eos = false;
 
 public:
     char *buffer_begin = buffer;
@@ -42,25 +41,35 @@ public:
         fd = open(path, O_RDONLY);
         assert(fd != -1);
 
+        // + 16 for gzip header & footer parsing
+        assert(inflateInit2(&inflator, 15 + 16) == 0);
+
         readMore(nullptr, 0);
     }
 
     // close the file when this object is deleted
     ~GzipReadBuffer() {
         assert(close(fd) == 0);
+        assert(inflateEnd(&inflator) == 0);
     }
 
     // read bytes from file, and write to buffer + starting_from
     // sets eof = true when there are no more bytes to be read
     void readMore(char *toKeep, size_t toKeepSize) {
-        // eof if inflator reported done last time
-        if (unlikely(inflator.done)) {
-            assert(inflator.verifyFooter(raw_begin));
+        // fetch more raw data if needed
+        if (raw_begin == raw_end) {
+            int readSize = read(fd, raw_buffer, BUFF_SIZE_RAW);
+            assert(readSize != -1);
 
-            if (raw_begin != raw_end && raw_end - raw_begin > 8) { // appended file
-                raw_begin += 8; // skip footer
-                raw_begin += MinizInflator::parseGzipHeader(raw_begin); // parse header
-                inflator = {}; // reset inflator
+            // update pointers
+            raw_begin = raw_buffer;
+            raw_end = raw_buffer + readSize;
+        }
+
+        // eof if inflator reported done last time && no more raw data left
+        if (unlikely(zlib_eos)) {
+            if (raw_begin != raw_end) { // appended file
+                assert(inflateReset(&inflator) == 0);
             } else {
                 eof = true;
                 memset(buffer_end, 0, 64); // clear last 64 bytes
@@ -72,32 +81,21 @@ public:
         memmove(buffer, toKeep, toKeepSize);
         buffer_end = buffer + toKeepSize;
 
-        // fetch more raw data if need be
-        if (raw_begin == raw_end) {
-            int readSize = read(fd, raw_buffer, BUFF_SIZE_RAW);
-            assert(readSize != -1);
+        // inflate data
+        inflator.avail_in = raw_end - raw_begin;
+        inflator.next_in = raw_begin;
 
-            if (readSize == 0) raw_eof = true;
+        inflator.avail_out = BUFF_SIZE_TOTAL - toKeepSize;
+        inflator.next_out = (uint8_t *) buffer_end;
 
-            // update pointers
-            raw_begin = raw_buffer;
-            raw_end = raw_buffer + readSize;
-        }
-
-        // temp header skip
-        if (unlikely(need_header_parse)) {
-            raw_begin += MinizInflator::parseGzipHeader(raw_begin);
-            need_header_parse = false;
-        }
-
-        size_t available_in = raw_end - raw_begin;
-        size_t available_out = BUFF_SIZE_TOTAL - toKeepSize;
-        inflator.inflate(raw_begin, &available_in, buffer_end, &available_out, !raw_eof);
+        int status = inflate(&inflator, Z_SYNC_FLUSH);
+        assert(status == Z_OK || status == Z_STREAM_END);
+        zlib_eos = status;
 
         // the difference between the original available size and the available size after the call is the size of written bytes
-        buffer_end += (BUFF_SIZE_TOTAL - toKeepSize) - available_out;
+        buffer_end += (BUFF_SIZE_TOTAL - toKeepSize) - inflator.avail_out;
 
         // same for raw_begin
-        raw_begin += (raw_end - raw_begin) - available_in;
+        raw_begin += (raw_end - raw_begin) - inflator.avail_in;
     }
 };

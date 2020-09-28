@@ -14,6 +14,7 @@ The second argument can also be `GzipReadBuffer`, which would be used with <i>.g
 ## general tips
 * not completely csv-standard compliant, it <b>does NOT deal with quoted columns</b>.
 * uses <b>SIMD</b> (AVX2) instructions if available, to process 64 characters at once.
+* uses Chromium's zlib implementation for best inflate performance
 * a FastCSV object should be heap-allocated with new(), as it uses more than 1MB of memory - a bit to much for the stack.
 * iterating a csv object row by row should be done with range-based for loops, for easier syntax and equal efficiency.
 * indexing a row is as easy as `row[COLUMN_INDEX]`. This returns a `std::string_view` (>C++17) object, which contains a pointer to the beginning of the original data and a size variable.
@@ -72,5 +73,7 @@ for (const auto &row : *csv) {
 delete csv;
 ```
 
-### usage in project
-All files in the `lib/` folder need to be included for raw + gzip functionality.
+### usage
+For Gzip support, zlib is needed. The Chromium (optimized) implementation of zlib is included in `lib/zlib`. To build it on x64 linux, run `lib/zlib/build.sh`.
+
+Simply include the 3 header files and link the zlib library to use FastCSV.
