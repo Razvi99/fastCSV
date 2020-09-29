@@ -2,6 +2,8 @@
 
 #include "rawReadBuffer.hpp"
 
+#define FCSV_RELAX_REQUIREMENTS
+
 #ifdef __AVX2__
 
 #include <x86intrin.h>
@@ -132,8 +134,14 @@ private:
         // this is the start of the next row, used in size calculation for string_view
         row.column[current_column] = ++buff_pos; // also skip newline
 
+#ifdef FCSV_RELAX_REQUIREMENTS
+        if constexpr (!first_row)
+            assert(current_column == header_columns - 1 || current_column == header_columns + 1);
+        row.columns = current_column;
+#else
         if constexpr (first_row) row.columns = current_column;
         assert(row.columns == current_column && "CSV file has inconsistent number of columns");
+#endif
     }
 #else
     template<bool first_row = false>
@@ -174,8 +182,14 @@ private:
         // this is the start of the next row, used in size calculation for string_view
         row.column[current_column] = ++buff_pos; // also skip newline
 
+#ifdef FCSV_RELAX_REQUIREMENTS
+        if constexpr (!first_row)
+            assert(current_column == header_columns - 1 || current_column == header_columns + 1);
+        row.columns = current_column;
+#else
         if constexpr (first_row) row.columns = current_column;
         assert(row.columns == current_column && "CSV file has inconsistent number of columns");
+#endif
     }
 #endif
 
@@ -183,12 +197,19 @@ private:
     };
 
 public:
+    int header_columns = 0;
+
     explicit FastCSV(const char *path, const std::initializer_list<std::pair<std::string_view, int &>> &&header_args = {})
             : io{path}, buff_pos{io.buffer_begin} {
         parseNextRow<true>();
 
         // make sure that max_columns were enough
         assert(row.columns < max_columns + 1 && "CSV file has more columns than given maximum");
+
+        // ignore last column if name in header is empty
+        if (row[row.columns - 1].empty()) --row.columns;
+
+        header_columns = row.columns;
 
         // parse header column names
         if (header_args.size()) {
