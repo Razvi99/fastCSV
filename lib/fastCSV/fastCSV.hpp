@@ -136,7 +136,7 @@ private:
 
 #ifdef FCSV_RELAX_REQUIREMENTS
         if constexpr (!first_row)
-            assert(current_column == header_columns - 1 || current_column == header_columns + 1);
+            assert(current_column == header_columns || current_column == header_columns - 1 || current_column == header_columns + 1);
         row.columns = current_column;
 #else
         if constexpr (first_row) row.columns = current_column;
@@ -184,7 +184,7 @@ private:
 
 #ifdef FCSV_RELAX_REQUIREMENTS
         if constexpr (!first_row)
-            assert(current_column == header_columns - 1 || current_column == header_columns + 1);
+            assert(current_column == header_columns || current_column == header_columns - 1 || current_column == header_columns + 1);
         row.columns = current_column;
 #else
         if constexpr (first_row) row.columns = current_column;
