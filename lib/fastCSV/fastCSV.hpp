@@ -217,8 +217,8 @@ public:
     public:
         explicit iterator(FastCSV *fastCsv) : fastCsv{fastCsv} {}
         void operator++() { fastCsv->parseNextRow(); }
-        bool operator!=(const sentinel) { return !fastCsv->eos; }
-        const FastCSVRow &operator*() { return fastCsv->row; }
+        bool operator!=(const sentinel) const { return !fastCsv->eos; }
+        const FastCSVRow &operator*() const { return fastCsv->row; }
     private:
         FastCSV *fastCsv{};
     };
