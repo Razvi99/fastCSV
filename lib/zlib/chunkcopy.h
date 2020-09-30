@@ -1,4 +1,26 @@
 /* chunkcopy.h -- fast chunk copy and set operations
+ *
+ * (C) 1995-2013 Jean-loup Gailly and Mark Adler
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ *
+ * Jean-loup Gailly        Mark Adler
+ * jloup@gzip.org          madler@alumni.caltech.edu
+ *
  * Copyright (C) 2017 ARM, Inc.
  * Copyright 2017 The Chromium Authors. All rights reserved.
  * Use of this source code is governed by a BSD-style license that can be
@@ -112,10 +134,6 @@ static inline unsigned char FAR* chunkcopy_core_safe(
   Assert(out + len <= limit, "chunk copy exceeds safety limit");
   if ((limit - out) < (ptrdiff_t)CHUNKCOPY_CHUNK_SIZE) {
     const unsigned char FAR* Z_RESTRICT rfrom = from;
-    Assert((uintptr_t)out - (uintptr_t)from >= len,
-           "invalid restrict in chunkcopy_core_safe");
-    Assert((uintptr_t)from - (uintptr_t)out >= len,
-           "invalid restrict in chunkcopy_core_safe");
     if (len & 8) {
       Z_BUILTIN_MEMCPY(out, rfrom, 8);
       out += 8;
@@ -207,8 +225,7 @@ static inline z_vec128i_t v_load8_dup(const void* src) {
 static inline void v_store_128(void* out, const z_vec128i_t vec) {
   vst1q_u8(out, vec);
 }
-
-#elif defined(INFLATE_CHUNK_SIMD_SSE2)
+#elif defined (INFLATE_CHUNK_SIMD_SSE2)
 /*
  * v_load64_dup(): load *src as an unaligned 64-bit int and duplicate it in
  * every 64-bit component of the 128-bit result (64-bit int splat).
@@ -342,10 +359,6 @@ static inline unsigned char FAR* chunkcopy_relaxed(
     unsigned char FAR* Z_RESTRICT out,
     const unsigned char FAR* Z_RESTRICT from,
     unsigned len) {
-  Assert((uintptr_t)out - (uintptr_t)from >= len,
-         "invalid restrict in chunkcopy_relaxed");
-  Assert((uintptr_t)from - (uintptr_t)out >= len,
-         "invalid restrict in chunkcopy_relaxed");
   return chunkcopy_core(out, from, len);
 }
 
@@ -368,11 +381,6 @@ static inline unsigned char FAR* chunkcopy_safe(
     unsigned len,
     unsigned char FAR* limit) {
   Assert(out + len <= limit, "chunk copy exceeds safety limit");
-  Assert((uintptr_t)out - (uintptr_t)from >= len,
-         "invalid restrict in chunkcopy_safe");
-  Assert((uintptr_t)from - (uintptr_t)out >= len,
-         "invalid restrict in chunkcopy_safe");
-
   return chunkcopy_core_safe(out, from, len, limit);
 }
 
@@ -417,26 +425,6 @@ static inline unsigned char FAR* chunkcopy_lapped_safe(
     return out;
   }
   return chunkcopy_lapped_relaxed(out, dist, len);
-}
-
-/* TODO(cavalcanti): see crbug.com/1110083. */
-static inline unsigned char FAR* chunkcopy_safe_ugly(unsigned char FAR* out,
-                                                     unsigned dist,
-                                                     unsigned len,
-                                                     unsigned char FAR* limit) {
-#if defined(__GNUC__) && !defined(__clang__)
-  /* Speed is the same as using chunkcopy_safe
-     w/ GCC on ARM (tested gcc 6.3 and 7.5) and avoids
-     undefined behavior.
-  */
-  return chunkcopy_core_safe(out, out - dist, len, limit);
-#elif defined(__clang__) && defined(ARMV8_OS_ANDROID) && !defined(__aarch64__)
-  /* Seems to perform better on 32bit (i.e. Android). */
-  return chunkcopy_core_safe(out, out - dist, len, limit);
-#else
-  /* Seems to perform better on 64bit. */
-  return chunkcopy_lapped_safe(out, dist, len, limit);
-#endif
 }
 
 /*

@@ -16,4 +16,4 @@ find_package(Threads REQUIRED)
 add_executable(fastCSV main.cpp)
 
 get_filename_component(BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}" ABSOLUTE)
-target_link_libraries(fastCSV Threads::Threads ${BASE_DIR}/lib/zlib/libzlib_chromium.a)
+target_link_libraries(fastCSV Threads::Threads ${BASE_DIR}/lib/zlib/libz.a)
