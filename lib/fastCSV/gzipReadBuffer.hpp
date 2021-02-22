@@ -73,6 +73,10 @@ public:
             } else {
                 eof = true;
                 memset(buffer_end, 0, 64); // clear last 64 bytes
+
+                // we still need to copy toKeep data
+                memmove(buffer, toKeep, toKeepSize);
+                buffer_end = buffer + toKeepSize;
                 return;
             }
         }
