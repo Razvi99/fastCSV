@@ -85,7 +85,9 @@ private:
             // copy the data for this row to the beginning of the buffer, and read more data after that
             // io.buffer_end - buff_pos is the number of bytes to be kept in the buffer
             io.readMore(buff_pos, io.buffer_end - buff_pos);
-            buff_pos = io.buffer_begin;
+            if (likely(!io.eof)) {
+                buff_pos = io.buffer_begin;
+            }
         }
 
         int current_column = 0;
